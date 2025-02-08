@@ -1,69 +1,39 @@
-name: Publish Docker image
+name: Build and Push Docker Image
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  # 手动触发工作流
   workflow_dispatch:
-    inputs:
-      name:
-        description: 'reason'
-        required: false
+  # 当一个新版本发布（即发布状态变为 “已发布”）时，触发该工作流
+  release:
+    types: [published]
+  # 当有代码推送到 main 分支时触发工作流
+  #push:
+    #branches:
+     # - main
+
+env:
+  REGISTRY: ${{ secrets.HUAWEI_REGISTRY_URL }}
+  IMAGE_NAME: docker-common/nextchat  # 替换为你的组织/仓库名
+
 jobs:
-  push_to_registries:
-    name: Push Docker image to multiple registries
+  build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Check repository URL
-        run: |
-          REPO_URL=$(git config --get remote.origin.url)
-          if [[ $REPO_URL == *"pro" ]]; then
-            exit 1
-          fi
-
-      - name: Save version info
-        run: |
-          git describe --tags > VERSION 
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Login to Huawei SWR
+        uses: docker/login-action@v3
         with:
           registry: ${{ secrets.HUAWEI_REGISTRY_URL }}
           username: ${{ secrets.HUAWEI_REGISTRY_USERNAME }}
           password: ${{ secrets.HUAWEI_REGISTRY_PASSWORD }}
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ secrets.HUAWEI_REGISTRY_URL }}/docker-common/nextchat
-			
-      - name: Build and push Docker images
-        uses: docker/build-push-action@v3
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ contains(github.ref, 'alpha') && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            TARGETARCH=${{ startsWith(matrix.platform, 'linux/arm64') && 'arm64' || 'amd64' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
