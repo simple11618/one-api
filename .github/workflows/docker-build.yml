@@ -55,10 +55,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.HUAWEI_REGISTRY_URL }}/docker-common/nextchat 
-          tags: |
-            type=raw,value=latest
-            type=ref,event=tag
+          images: ${{ secrets.HUAWEI_REGISTRY_URL }}/docker-common/nextchat
 			
       - name: Build and push Docker images
         uses: docker/build-push-action@v3
